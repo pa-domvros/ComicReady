@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComicReady - Welcome</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Comic Neue', cursive;
+        }
+        .script-slot {
+            background-color: #e5e7eb; /* gray-200 */
+            border: 2px dashed #9ca3af; /* gray-400 */
+            color: #9ca3af;
+            transition: all 0.3s ease;
+            min-height: 50px; /* Ensure slot has height */
+        }
+        .script-slot.filled {
+            background-color: #d1fae5; /* green-100 */
+            border: 2px solid #10b981; /* green-500 */
+            color: #064e3b; /* green-900 */
+            font-weight: bold;
+        }
+        .script-slot.drag-over {
+            transform: scale(1.02);
+            border-color: #3b82f6; /* blue-500 */
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+        }
+        .sentence-option {
+            cursor: grab;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+        .sentence-option.dragging {
+            opacity: 0.5;
+        }
+        .incorrect-drop {
+            animation: shake 0.5s;
+            background-color: #fee2e2; /* red-100 */
+            border-color: #ef4444; /* red-500 */
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        .relative {
+            position: relative;
+        }
+    </style>
+</head>
+<body class="bg-blue-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <!-- Introduction Page -->
+    <div id="intro-page" class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg text-center">
+        <h1 class="text-5xl font-bold text-blue-600 mb-4">ComicReady</h1>
+        <h2 class="text-2xl font-bold text-gray-700 mb-4">Οδηγίες</h2>
+        <p class="text-lg text-gray-600 mb-6">
+            Σύρε τις προτάσεις από την τράπεζα προτάσεων στη σωστή σειρά του διαλόγου!
+        </p>
+        <p class="text-md italic text-gray-500 mb-8">
+           <strong> Created by Panagiotis Domvros on an idea by Nina Arconti</strong>
+        </p>
+        <button id="start-btn" class="w-full px-8 py-4 bg-green-500 text-white font-bold text-xl rounded-full hover:bg-green-600 transition-transform transform hover:scale-105 shadow-lg">
+            Έναρξη Παιχνιδιού
+        </button>
+    </div>
+
+    <!-- Game Page (Initially Hidden) -->
+    <div id="game-page" class="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-lg" style="display: none;">
+        <h1 class="text-4xl font-bold text-center text-blue-600 mb-2">ComicReady</h1>
+        <p class="text-center text-gray-500 mb-6">Drag the sentences from the bank to the correct script slot!</p>
+
+        <!-- Comic image for visual context only -->
+        <div id="comic-container" class="relative mb-6 w-full mx-auto">
+            <img id="comic-image" src="" alt="Comic Strip" class="w-full rounded-lg shadow-md">
+        </div>
+
+        <!-- The storyboard/script area -->
+        <div id="script-container" class="space-y-3 mb-6"></div>
+
+        <!-- The bank of sentence options -->
+        <div id="sentence-bank" class="flex flex-wrap justify-center gap-3 p-4 bg-blue-50 rounded-lg min-h-[80px]"></div>
+
+        <div class="flex justify-center gap-4 mt-6">
+            <button id="reset-btn" class="px-8 py-3 bg-yellow-400 text-white font-bold rounded-full hover:bg-yellow-500 transition-transform transform hover:scale-105 shadow-lg">Reset</button>
+            <button id="next-btn" class="px-8 py-3 bg-green-500 text-white font-bold rounded-full hover:bg-green-600 transition-transform transform hover:scale-105 shadow-lg">Next</button>
+        </div>
+    </div>
+
+    <!-- Completion Page (Initially Hidden) -->
+    <div id="completion-page" class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg text-center" style="display: none;">
+        <h1 class="text-4xl font-bold text-green-600 mb-4">Congratulations!</h1>
+        <p class="text-lg text-gray-600 mb-8">You have completed all the comics!</p>
+        <button id="play-again-btn" class="w-full px-8 py-4 bg-blue-500 text-white font-bold text-xl rounded-full hover:bg-blue-600 transition-transform transform hover:scale-105 shadow-lg">
+            Παίξε ξανά
+        </button>
+    </div>
+
+    <footer class="text-center text-gray-600 py-4 mt-4">
+        ✨✍️ Devised by Panagiotis Domvros, English and Drama Teacher © 2025✍️✨
+    </footer>
+
+    <script>
+        // --- Page Navigation ---
+        const introPage = document.getElementById('intro-page');
+        const gamePage = document.getElementById('game-page');
+        const completionPage = document.getElementById('completion-page');
+        const startBtn = document.getElementById('start-btn');
+        const playAgainBtn = document.getElementById('play-again-btn');
+
+        startBtn.addEventListener('click', () => {
+            introPage.style.display = 'none';
+            gamePage.style.display = 'block';
+            document.querySelector('footer').style.display = 'none'; 
+        });
+
+        playAgainBtn.addEventListener('click', () => {
+            completionPage.style.display = 'none';
+            introPage.style.display = 'block';
+            document.querySelector('footer').style.display = 'block';
+            currentComicIndex = 0;
+            loadComic(currentComicIndex);
+        });
+
+        // --- Game Logic ---
+        const comicData = [
+            { image: 'images/1.jpg', script: [ { character: 'Leo', text: "Hi, Mia!" }, { character: 'Mia', text: "Hello, Leo!" }, { character: 'Leo', text: "How are you?" }, { character: 'Mia', text: "I'm fine, thanks!" } ] },
+            { image: 'images/2.jpg', script: [ { character: 'Ben', text: "What is this?" }, { character: 'Anna', text: "It's a car." }, { character: 'Ben', text: "Is it fast?" }, { character: 'Anna', text: "Yes, it is!" } ] },
+            { image: 'images/3.jpg', script: [ { character: 'Alex', text: "I'm hungry." }, { character: 'Chloe', text: "Me too." }, { character: 'Alex', text: "Do you want an apple?" }, { character: 'Chloe', text: "Yes, please." } ] },
+            { image: 'images/4.jpg', script: [ { character: 'Tom', text: "Where is my bag?" }, { character: 'Lily', text: "It's on the chair." }, { character: 'Tom', text: "And my book?" }, { character: 'Lily', text: "It's in your bag." } ] },
+            { image: 'images/5.jpg', script: [ { character: 'Jake', text: "Let's play!" }, { character: 'Sophie', text: "Okay." }, { character: 'Jake', text: "Can you catch me?" }, { character: 'Sophie', text: "I will try!" } ] },
+            { image: 'images/6.jpg', script: [ { character: 'Noah', text: "What are you drawing?" }, { character: 'Emma', text: "A big sun." }, { character: 'Noah', text: "I like it!" }, { character: 'Emma', text: "Thank you." } ] },
+            { image: 'images/7.jpg', script: [ { character: 'Sam', text: "Can you help me?" }, { character: 'Dad', text: "Sure." }, { character: 'Sam', text: "I can't reach it." }, { character: 'Dad', text: "Here you go." } ] },
+            { image: 'images/8.jpg', script: [ { character: 'Chris', text: "Look! A cat." }, { character: 'Olivia', text: "It's so cute." }, { character: 'Chris', text: "What is its name?" }, { character: 'Olivia', text: "I don't know." } ] },
+            { image: 'images/9.jpg', script: [ { character: 'Max', text: "It's time to go." }, { character: 'Zoe', text: "Okay. Bye!" }, { character: 'Max', text: "See you tomorrow." }, { character: 'Zoe', text: "Bye-bye!" } ] },
+            { image: 'images/10.jpg', script: [ { character: 'Daniel', text: "Is it hot today?" }, { character: 'Isabella', text: "Yes, it is." }, { character: 'Daniel', text: "Let's go outside." }, { character: 'Isabella', text: "That's a good idea!" } ] }
+        ];
+
+        let currentComicIndex = 0;
+
+        const comicImage = document.getElementById('comic-image');
+        const scriptContainer = document.getElementById('script-container');
+        const sentenceBank = document.getElementById('sentence-bank');
+        const nextBtn = document.getElementById('next-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        
+        function loadComic(index) {
+            if (index >= comicData.length) {
+                gamePage.style.display = 'none';
+                completionPage.style.display = 'block';
+                document.querySelector('footer').style.display = 'block';
+                return;
+            }
+            const comic = comicData[index];
+            comicImage.src = comic.image;
+            comicImage.onerror = () => {
+                comicImage.src = `https://placehold.co/800x400/e2e8f0/cbd5e1?text=Image+not+found`;
+            };
+
+            // Create script slots
+            scriptContainer.innerHTML = '';
+            comic.script.forEach((line, i) => {
+                const slot = document.createElement('div');
+                slot.className = 'script-slot p-3 rounded-lg text-lg flex items-center justify-center';
+                slot.dataset.index = i;
+                slot.dataset.correctText = line.text;
+                
+                // Add "Αρχίζει ο [Character]" for the first line of each comic
+                if (i === 0) {
+                    slot.innerHTML = `
+                        <div class="text-sm text-gray-500 absolute -top-5 left-0">Αρχίζει ο ${line.character}</div>
+                        <span class="font-bold">${line.character}:</span> <span class="ml-2">...</span>
+                    `;
+                    slot.classList.add('relative'); // Add relative positioning for the absolute positioned indicator
+                } else {
+                    slot.innerHTML = `<span class="font-bold">${line.character}:</span> <span class="ml-2">...</span>`;
+                }
+                scriptContainer.appendChild(slot);
+            });
+
+            // Create sentence bank
+            sentenceBank.innerHTML = '';
+            const shuffledSentences = [...comic.script].sort(() => Math.random() - 0.5);
+            shuffledSentences.forEach(line => {
+                const option = document.createElement('div');
+                option.className = 'sentence-option bg-white p-2 rounded-md shadow border-2 border-gray-300';
+                option.textContent = line.text;
+                option.draggable = true;
+                sentenceBank.appendChild(option);
+            });
+            
+            addDragAndDropListeners();
+        }
+
+        function addDragAndDropListeners() {
+            const sentences = document.querySelectorAll('.sentence-option');
+            const slots = document.querySelectorAll('.script-slot');
+
+            sentences.forEach(sentence => {
+                sentence.addEventListener('dragstart', (e) => {
+                    e.target.classList.add('dragging');
+                    e.dataTransfer.setData('text/plain', e.target.textContent);
+                });
+
+                sentence.addEventListener('dragend', (e) => {
+                    e.target.classList.remove('dragging');
+                });
+            });
+
+            slots.forEach(slot => {
+                slot.addEventListener('dragover', (e) => {
+                    if (!slot.classList.contains('filled')) {
+                        e.preventDefault();
+                        slot.classList.add('drag-over');
+                    }
+                });
+
+                slot.addEventListener('dragleave', () => {
+                    slot.classList.remove('drag-over');
+                });
+
+                slot.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    slot.classList.remove('drag-over');
+                    if (slot.classList.contains('filled')) return;
+
+                    const droppedText = e.dataTransfer.getData('text/plain');
+                    const correctText = slot.dataset.correctText;
+
+                    if (droppedText === correctText) {
+                        const comic = comicData[currentComicIndex];
+                        const character = comic.script[slot.dataset.index].character;
+                        
+                        // Keep the "Αρχίζει ο [Character]" indicator if it's the first line
+                        if (slot.dataset.index === '0') {
+                            slot.innerHTML = `
+                                <div class="text-sm text-gray-500 absolute -top-5 left-0">Αρχίζει ο ${character}</div>
+                                <span class="font-bold">${character}:</span><span class="ml-2">${correctText}</span>
+                            `;
+                        } else {
+                            slot.innerHTML = `<span class="font-bold">${character}:</span><span class="ml-2">${correctText}</span>`;
+                        }
+                        
+                        slot.classList.add('filled');
+                        
+                        document.querySelectorAll('.sentence-option').forEach(opt => {
+                            if (opt.textContent === droppedText) {
+                                opt.style.display = 'none';
+                            }
+                        });
+                    } else {
+                        slot.classList.add('incorrect-drop');
+                        setTimeout(() => {
+                            slot.classList.remove('incorrect-drop');
+                        }, 500);
+                    }
+                });
+            });
+        }
+        
+        nextBtn.addEventListener('click', () => {
+            currentComicIndex++;
+            loadComic(currentComicIndex);
+        });
+
+        resetBtn.addEventListener('click', () => {
+            loadComic(currentComicIndex);
+        });
+
+        // Initial load of the game logic (but the game page is hidden)
+        loadComic(currentComicIndex);
+    </script>
+</body>
+</html>
